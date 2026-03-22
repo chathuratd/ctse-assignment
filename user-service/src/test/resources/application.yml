@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Test Configuration — overrides application.yml when running tests
+# ─────────────────────────────────────────────────────────────────────────────
+# This file is loaded when tests run because we use @SpringBootTest or
+# the test classpath is active.
+#
+# WHY H2 FOR TESTS?
+# ──────────────────
+# H2 is an in-memory database (lives in RAM, deleted when test ends).
+# Benefits:
+#   - Tests run without a real database connection (no Supabase needed)
+#   - Tests run fast (no network round-trips)
+#   - Each test run starts with a clean, empty database
+#   - CI/CD pipelines (GitHub Actions) don't need DB credentials
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop      # Fresh schema for every test run
+
+  # Disable Flyway for tests if you add it later
+  flyway:
+    enabled: false
+
+app:
+  jwt:
+    # Fixed secret for tests — safe to hardcode here (test env only)
+    secret: dGVzdC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RzLW9ubHktMzItY2hhcnM=
+    expiration-ms: 3600000    # 1 hour (shorter for tests)
+  services:
+    notification-url: http://localhost:8004

@@ -1,0 +1,38 @@
+server:
+  port: 8002
+
+spring:
+  application:
+    name: event-service
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+
+# ── Inter-service URLs ──────────────────────────────────────────────────────
+# Event Service calls User Service to get all users (for NEW_EVENT notifications)
+# and Notification Service to send those notifications.
+# Defaults point to Docker Compose service names; override with env vars.
+app:
+  services:
+    user-url: ${USER_SERVICE_URL:http://user-service:8001}
+    notification-url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8004}

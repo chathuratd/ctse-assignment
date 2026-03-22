@@ -1,0 +1,111 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# User Service — Application Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ENVIRONMENT VARIABLES:
+# -----------------------
+# This config reads sensitive values from environment variables.
+# This is a security best practice — never hardcode credentials in source code.
+#
+# For local development, create a .env file (see .env.example) or
+# export variables in your shell before running:
+#   export DB_URL=jdbc:postgresql://...
+#   export DB_USERNAME=postgres
+#   export DB_PASSWORD=yourpassword
+#   export JWT_SECRET=your-base64-encoded-secret
+#
+# For AWS deployment, these are set as ECS Task Definition environment variables
+# or via AWS Systems Manager Parameter Store / Secrets Manager.
+#
+# GENERATING A JWT SECRET:
+# -------------------------
+# The secret must be Base64-encoded and at least 256 bits (32 bytes).
+# Generate one with:
+#   Linux/Mac: openssl rand -base64 32
+#   Or run: echo -n "your-random-string-at-least-32-chars" | base64
+# ─────────────────────────────────────────────────────────────────────────────
+
+server:
+  port: 8001                        # This service runs on port 8001
+
+spring:
+  application:
+    name: user-service
+
+  # ── Database Configuration ──────────────────────────────────────────────────
+  # We use Supabase (hosted PostgreSQL). Connection via JDBC URL.
+  #
+  # Supabase connection string format:
+  #   jdbc:postgresql://<project-ref>.supabase.co:5432/postgres?sslmode=require
+  #
+  # ABOUT SSL:
+  # Supabase requires SSL. The ?sslmode=require parameter enforces this.
+  # Without it, the connection will be rejected.
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+    # Connection Pool (HikariCP — Spring Boot's default, very performant)
+    # These settings prevent connection exhaustion in production
+    hikari:
+      maximum-pool-size: 5          # Keep it low for Supabase free tier limits
+      minimum-idle: 2
+      connection-timeout: 30000     # 30 seconds to acquire a connection
+      idle-timeout: 600000          # Close idle connections after 10 minutes
+
+  # ── JPA / Hibernate Configuration ──────────────────────────────────────────
+  jpa:
+    # Which database dialect to use (tells Hibernate which SQL to generate)
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+    hibernate:
+      # DDL AUTO STRATEGIES (very important to understand):
+      # ─────────────────────────────────────────────────────
+      # create        → DROP + CREATE tables on every startup (⚠️ data loss!)
+      # create-drop   → create on startup, DROP on shutdown (used in tests)
+      # update        → ADD new columns/tables, never drop existing (dev use)
+      # validate      → only check schema matches entities, error if not (prod use)
+      # none          → do nothing to the schema (manage DB manually)
+      #
+      # Current: update — safe for development, creates tables automatically.
+      # For production: use "validate" and manage schema with Flyway migrations.
+      ddl-auto: update
+
+    # Show SQL in logs — useful for learning to see what Hibernate generates
+    show-sql: true
+
+    properties:
+      hibernate:
+        # Pretty-print the SQL in logs (easier to read)
+        format_sql: true
+
+        # Timezone consistency — store all dates as UTC in the DB
+        jdbc:
+          time_zone: UTC
+
+# ── JWT Configuration ──────────────────────────────────────────────────────────
+# Custom properties under the "app" namespace
+# Injected into JwtUtils via @Value("${app.jwt.secret}")
+app:
+  jwt:
+    # Base64-encoded HMAC-SHA256 secret key (minimum 256 bits)
+    # Set this as an environment variable in production
+    secret: ${JWT_SECRET}
+
+    # Token validity duration in milliseconds
+    # 86400000 ms = 86400 seconds = 24 hours
+    expiration-ms: 86400000
+
+  services:
+    notification-url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8004}
+
+# ── Logging ────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    # Show SQL with bound parameter values (useful during development)
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    # Show Spring Security decisions (who authenticated, which filter ran)
+    org.springframework.security: DEBUG

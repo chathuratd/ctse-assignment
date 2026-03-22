@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+
+# Stub URLs for tests (won't actually be called in unit tests)
+app:
+  services:
+    user-url: http://localhost:8001
+    event-url: http://localhost:8002
+    notification-url: http://localhost:8004

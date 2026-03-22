@@ -1,0 +1,41 @@
+server:
+  port: 8003
+
+spring:
+  application:
+    name: registration-service
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+# ── Inter-Service Communication URLs ─────────────────────────────────────────
+# In Docker Compose, these resolve to the container names by Docker DNS.
+# In AWS ECS (same VPC), use private DNS names or service discovery.
+# For local development without Docker, use localhost:PORT.
+app:
+  services:
+    user-url: ${USER_SERVICE_URL:http://user-service:8001}
+    event-url: ${EVENT_SERVICE_URL:http://event-service:8002}
+    notification-url: ${NOTIFICATION_SERVICE_URL:http://notification-service:8004}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    com.ctse.registrationservice: INFO

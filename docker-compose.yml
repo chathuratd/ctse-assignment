@@ -1,0 +1,140 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Docker Compose — Full Platform Local Development
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# USAGE:
+#   1. Create .env files from .env.example in each service folder:
+#        cp user-service/.env.example user-service/.env
+#        cp event-service/.env.example event-service/.env
+#        cp registration-service/.env.example registration-service/.env
+#        cp notification-service/.env.example notification-service/.env
+#   2. Fill in Supabase credentials in each .env file
+#   3. Run: docker compose up --build
+#
+# HOW SERVICES FIND EACH OTHER (Docker DNS):
+# ──────────────────────────────────────────
+# Docker Compose creates a shared network for all services.
+# Each service name (user-service, event-service, etc.) becomes a DNS hostname.
+# So Registration Service can reach User Service at:
+#   http://user-service:8001/users/{id}
+# Docker resolves "user-service" to the container's internal IP automatically.
+#
+# SERVICE STARTUP ORDER:
+# ──────────────────────
+# Registration Service depends_on User Service, Event Service, Notification Service.
+# Without those running, inter-service calls would fail.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── User Service (port 8001) ────────────────────────────────────────────────
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    image: user-service:local
+    container_name: user-service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./user-service/.env
+    environment:
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - conference-network
+
+  # ── Event Service (port 8002) ───────────────────────────────────────────────
+  event-service:
+    build:
+      context: ./event-service
+      dockerfile: Dockerfile
+    image: event-service:local
+    container_name: event-service
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./event-service/.env
+    environment:
+      USER_SERVICE_URL: http://user-service:8001
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - conference-network
+
+  # ── Registration Service (port 8003) ────────────────────────────────────────
+  # Depends on user-service, event-service, and notification-service because
+  # it calls all three during the POST /registrations flow.
+  registration-service:
+    build:
+      context: ./registration-service
+      dockerfile: Dockerfile
+    image: registration-service:local
+    container_name: registration-service
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./registration-service/.env
+    environment:
+      # These override the defaults in application.yml for Docker Compose
+      USER_SERVICE_URL: http://user-service:8001
+      EVENT_SERVICE_URL: http://event-service:8002
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+    depends_on:
+      user-service:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8003/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - conference-network
+
+  # ── Notification Service (port 8004) ────────────────────────────────────────
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    image: notification-service:local
+    container_name: notification-service
+    ports:
+      - "8004:8004"
+    env_file:
+      - ./notification-service/.env
+    environment:
+      USER_SERVICE_URL: http://user-service:8001
+      EVENT_SERVICE_URL: http://event-service:8002
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8004/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - conference-network
+
+# ── Shared Network ─────────────────────────────────────────────────────────────
+# All services share this network so they can resolve each other by name.
+networks:
+  conference-network:
+    driver: bridge

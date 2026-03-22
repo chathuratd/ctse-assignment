@@ -1,0 +1,61 @@
+server:
+  port: 8004
+
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  # ── Email (Gmail SMTP) ──────────────────────────────────────────────────────
+  # Uses Gmail SMTP with TLS. You must generate an App Password:
+  #   1. Enable 2-Step Verification on your Google account
+  #   2. Go to https://myaccount.google.com/apppasswords
+  #   3. Generate a password for "Mail" → "Other (Custom name)"
+  #   4. Put that 16-char password in MAIL_PASSWORD env var
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+
+# ── Inter-service URLs ──────────────────────────────────────────────────────
+# Notification Service calls User Service and Event Service to fetch details
+# for building personalised notification message templates.
+# Defaults point to Docker Compose service names; override with env vars.
+app:
+  services:
+    user-url: ${USER_SERVICE_URL:http://user-service:8001}
+    event-url: ${EVENT_SERVICE_URL:http://event-service:8002}
